@@ -5,6 +5,7 @@ import play
 import static
 import utils
 
+import csv
 import os.path
 import pprint
 import glob
@@ -148,3 +149,35 @@ def render_settings_template(debug=False):
 
     """
     utils.render_settings_template(env.config_source, env.config_target, env.settings_vars, debug)
+
+
+def extlookup(key):
+    # We don't have access to env.host here.
+    # Only use the first host of precedence matching.
+    host = env.hosts[0]
+
+    precedence = [
+        "base.csv",
+        "domain_%s.csv" % host.partition('.')[2],
+        "%s.csv" % host,
+    ]
+
+    # Persist in env to prevent multiple reads.
+    # Will only scale so far.
+    if not "extdata" in env:
+        env.extdata = {}
+
+        # Merge results over each other in reverse order.
+        for file in precedence:
+            file = os.path.join("extdata", file)
+            if os.path.exists(file):
+                extdata = csv.reader(open(file))
+
+                for row in extdata:
+                    if len(row) < 1:
+                        continue
+
+                    env.extdata[row[0]] = row[1:]
+
+    # Return single value for request key. Only works with passwords.
+    return env.extdata[key][0]
